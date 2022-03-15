@@ -71,9 +71,9 @@ func is204Allowed(headers textproto.MIMEHeader) bool {
 }
 
 func getVendorName(serviceName string) string {
-	vendor := serviceName + ".vendor"
-	vendor = readValues.ReadValuesString(vendor)
-	return vendor
+	vendorName := serviceName + ".vendor"
+	vendorName = readValues.ReadValuesString(vendorName)
+	return vendorName
 }
 
 func getEnabledMethods(serviceName string) string {
@@ -115,9 +115,9 @@ func shadowService(elapsed time.Duration, Is204Allowed bool, req *icap.Request,
 }
 
 /* If any remote icap is enabled, the work flow is controlled by the remote icap */
-func optionsModeRemote(vendor string, req *icap.Request, w icap.ResponseWriter, appCfg *config.AppConfig, zlogger *logger.ZLogger) {
-	if strings.HasPrefix(vendor, utils.ICAPPrefix) {
-		doRemoteOPTIONS(req, w, vendor, appCfg.RespScannerVendorShadow, utils.ICAPModeResp, zlogger)
+func optionsModeRemote(vendorName string, req *icap.Request, w icap.ResponseWriter, appCfg *config.AppConfig, zlogger *logger.ZLogger) {
+	if strings.HasPrefix(vendorName, utils.ICAPPrefix) {
+		doRemoteOPTIONS(req, w, vendorName, appCfg.RespScannerVendorShadow, utils.ICAPModeResp, zlogger)
 		return
 	} else if strings.HasPrefix(appCfg.RespScannerVendorShadow, utils.ICAPPrefix) { // if the shadow wants to run independently
 		siSvc := service.GetICAPService(appCfg.RespScannerVendorShadow)
@@ -127,9 +127,9 @@ func optionsModeRemote(vendor string, req *icap.Request, w icap.ResponseWriter, 
 	}
 }
 
-func optionsMode(headers http.Header, serviceName string, appCfg *config.AppConfig, vendor string, req *icap.Request,
+func optionsMode(headers http.Header, serviceName string, appCfg *config.AppConfig, vendorName string, req *icap.Request,
 	w icap.ResponseWriter, zlogger *logger.ZLogger) {
-	//optionsModeRemote(vendor, req, w, appCfg, zlogger)
+	//optionsModeRemote(vendorName, req, w, appCfg, zlogger)
 	headers.Set("Methods", getEnabledMethods(serviceName))
 	headers.Set("Allow", "204")
 	// Add preview if preview_enabled is true in config
@@ -148,12 +148,17 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 	// setting up logging for each request
 	elapsed := time.Since(zlogger.LogStartTime)
 
+	//get the service name
+	serviceName := req.URL.Path[1:len(req.URL.Path)]
+
+	//get the vendorName
+	vendorName := getVendorName(serviceName)
+
 	//adding headers to the log
 	addHeadersToLogs(req.Header, elapsed)
 
 	// checking if the service doesn't exist in toml file
 	// if it does not exist, the response will be 404 ICAP Service Not Found
-	serviceName := req.URL.Path[1:len(req.URL.Path)]
 	if !isServiceExists(serviceName) {
 		w.WriteHeader(http.StatusNotFound, nil, false)
 		return
@@ -173,8 +178,6 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 		}
 	}
 
-	vendor := getVendorName(serviceName)
-
 	h := w.Header()
 	h.Set("ISTag", readValues.ReadValuesString(serviceName+".service_tag"))
 	h.Set("Service", readValues.ReadValuesString(serviceName+".service_caption"))
@@ -192,7 +195,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 
 	switch req.Method {
 	case utils.ICAPModeOptions:
-		optionsMode(h, serviceName, appCfg, vendor, req, w, zlogger)
+		optionsMode(h, serviceName, appCfg, vendorName, req, w, zlogger)
 
 	case utils.ICAPModeResp:
 		defer req.Response.Body.Close()
@@ -205,13 +208,13 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 
 		// change body to service name
 		/* If any remote icap is enabled, the work flow is controlled by the remote icap */
-		/*if strings.HasPrefix(vendor, utils.ICAPPrefix) {
-			doRemoteRESPMOD(req, w, vendor, appCfg.RespScannerVendorShadow)
+		/*if strings.HasPrefix(vendorName, utils.ICAPPrefix) {
+			doRemoteRESPMOD(req, w, vendorName, appCfg.RespScannerVendorShadow)
 			return
 		}*/
 
 		/* If the shadow icap wants to run independently */
-		/*if vendor == utils.NoVendor && strings.HasPrefix(appCfg.RespScannerVendorShadow, utils.ICAPPrefix) {
+		/*if vendorName == utils.NoVendor && strings.HasPrefix(appCfg.RespScannerVendorShadow, utils.ICAPPrefix) {
 			siSvc := service.GetICAPService(appCfg.RespScannerVendorShadow)
 			siSvc.SetHeader(req.Header)
 			shadowHTTPResp := utils.GetHTTPResponseCopy(req.Response)
@@ -220,7 +223,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 			return
 		}*/
 
-		/*if vendor == utils.NoVendor && appCfg.RespScannerVendorShadow == utils.NoVendor {  // if no scanner name provided, then bypass everything
+		/*if vendorName == utils.NoVendor && appCfg.RespScannerVendorShadow == utils.NoVendor {  // if no scanner name provided, then bypass everything
 			debugLogger.LogToFile("No respmod scanner provided...bypassing everything")
 			w.WriteHeader(http.StatusNoContent, nil, false)
 			return
@@ -313,15 +316,15 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 			FileSize: float64(buf.Len()),
 		}
 		/* If the shadow virus scanner wants to run independently */
-		if vendor == utils.NoVendor && appCfg.RespScannerVendorShadow != utils.NoVendor {
-			go doShadowScan(vendor, serviceName, filename, fmi, buf, "", zlogger)
+		if vendorName == utils.NoVendor && appCfg.RespScannerVendorShadow != utils.NoVendor {
+			go doShadowScan(vendorName, serviceName, filename, fmi, buf, "", zlogger)
 			w.WriteHeader(http.StatusNoContent, nil, false)
 			return
 		}
 		// Gw rebuild service req api , resp ICAP client
-		if vendor == "glasswall" {
+		if vendorName == "glasswall" {
 			filename = "test"
-			resp, statusCode, html, x_adaption_id, err := DoCDR(vendor, serviceName, buf, filename, req.Request.RequestURI, zlogger)
+			resp, statusCode, html, x_adaption_id, err := DoCDR(vendorName, serviceName, buf, filename, req.Request.RequestURI, zlogger)
 			if err != nil {
 				zLog.Debug().Dur("duration", elapsed).Str("value", fmt.Sprintf("file wasn't processed")).
 					Msgf("forbidden")
@@ -389,7 +392,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 
 		}
 		// echo servise
-		if vendor == "echo" {
+		if vendorName == "echo" {
 			bodybyte, err := ioutil.ReadAll(buf)
 			if err != nil {
 				fmt.Println(err)
@@ -408,7 +411,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 			return
 
 		}
-		status, sampleInfo := doScan(vendor, serviceName, filename, fmi, buf, "", zlogger) // scan the file for any anomalies
+		status, sampleInfo := doScan(vendorName, serviceName, filename, fmi, buf, "", zlogger) // scan the file for any anomalies
 
 		if status == http.StatusOK && sampleInfo != nil {
 			elapsed = time.Since(zlogger.LogStartTime)
@@ -420,7 +423,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 				RequestedURL: utils.BreakHTTPURL(req.Request.RequestURI),
 				Severity:     sampleInfo.SampleSeverity,
 				Score:        sampleInfo.VTIScore,
-				ResultsBy:    vendor,
+				ResultsBy:    vendorName,
 			})
 			w.WriteHeader(http.StatusOK, newResp, true)
 			w.Write(htmlBuf.Bytes())
@@ -451,13 +454,13 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 		}
 
 		/* If any remote icap is enabled, the work flow is controlled by the remote icap */
-		if strings.HasPrefix(vendor, utils.ICAPPrefix) {
-			doRemoteRESPMOD(req, w, vendor, appCfg.RespScannerVendorShadow, zlogger)
+		if strings.HasPrefix(vendorName, utils.ICAPPrefix) {
+			doRemoteRESPMOD(req, w, vendorName, appCfg.RespScannerVendorShadow, zlogger)
 			return
 		}
 
 		/* If the shadow icap wants to run independently */
-		if vendor == utils.NoVendor && strings.HasPrefix(appCfg.RespScannerVendorShadow, utils.ICAPPrefix) {
+		if vendorName == utils.NoVendor && strings.HasPrefix(appCfg.RespScannerVendorShadow, utils.ICAPPrefix) {
 			siSvc := service.GetICAPService(appCfg.RespScannerVendorShadow)
 			siSvc.SetHeader(req.Header)
 			shadowHTTPResp := utils.GetHTTPResponseCopy(req.Response)
@@ -466,7 +469,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 			return
 		}
 
-		if vendor == utils.NoVendor && appCfg.RespScannerVendorShadow == utils.NoVendor { // if no scanner name provided, then bypass everything
+		if vendorName == utils.NoVendor && appCfg.RespScannerVendorShadow == utils.NoVendor { // if no scanner name provided, then bypass everything
 			elapsed = time.Since(zlogger.LogStartTime)
 			zLog.Debug().Dur("duration", elapsed).Str("value", "no respmod scanner provided...bypassing everything").Msgf("no_response_mode_scanner_provided")
 			w.WriteHeader(http.StatusNoContent, nil, false)
@@ -539,19 +542,19 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 			FileSize: float64(buf.Len()),
 		}
 		/* If the shadow virus scanner wants to run independently */
-		if vendor == utils.NoVendor && appCfg.RespScannerVendorShadow != utils.NoVendor {
-			go doShadowScan(vendor, serviceName, filename, fmi, buf, "", zlogger)
+		if vendorName == utils.NoVendor && appCfg.RespScannerVendorShadow != utils.NoVendor {
+			go doShadowScan(vendorName, serviceName, filename, fmi, buf, "", zlogger)
 			w.WriteHeader(http.StatusNoContent, nil, false)
 			return
 		}
 
 		// Gw rebuid servise req api , resp icap client
-		if vendor == "glasswall" {
+		if vendorName == "glasswall" {
 			if req.Request == nil {
 				req.Request = &http.Request{}
 			}
 			filename = "test"
-			resp, _, _, x_adaption_id, err := DoCDR(vendor, serviceName, buf, filename, req.Request.RequestURI, zlogger)
+			resp, _, _, x_adaption_id, err := DoCDR(vendorName, serviceName, buf, filename, req.Request.RequestURI, zlogger)
 			if err != nil {
 				zLog.Error().Dur("duration", elapsed).Err(err).Str("value", "file wasn't processed").
 					Msgf("file_wasn't_processed")
@@ -584,7 +587,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 
 		}
 		// echo service
-		if vendor == "echo" {
+		if vendorName == "echo" {
 			bodybyte, err := ioutil.ReadAll(buf)
 			if err != nil {
 				fmt.Println(err)
@@ -603,7 +606,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 			return
 
 		}
-		status, sampleInfo := doScan(vendor, serviceName, filename, fmi, buf, "", zlogger) // scan the file for any anomalies
+		status, sampleInfo := doScan(vendorName, serviceName, filename, fmi, buf, "", zlogger) // scan the file for any anomalies
 
 		if status == http.StatusOK && sampleInfo != nil {
 			elapsed = time.Since(zlogger.LogStartTime)
@@ -615,7 +618,7 @@ func ToICAPEGServe(w icap.ResponseWriter, req *icap.Request, zlogger *logger.ZLo
 				RequestedURL: utils.BreakHTTPURL(req.Request.RequestURI),
 				Severity:     sampleInfo.SampleSeverity,
 				Score:        sampleInfo.VTIScore,
-				ResultsBy:    vendor,
+				ResultsBy:    vendorName,
 			})
 			w.WriteHeader(http.StatusOK, newResp, true)
 			w.Write(htmlBuf.Bytes())

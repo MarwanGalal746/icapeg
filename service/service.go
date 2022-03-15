@@ -18,11 +18,11 @@ import (
 
 // The service names
 const (
-	SVCVirusTotal   = "virustotal"
-	SVCMetaDefender = "metadefender"
-	SVCVmray        = "vmray"
+	VENVirusTotal   = "virustotal"
+	VENMetaDefender = "metadefender"
+	VENVmray        = "vmray"
 	SVCClamav       = "clamav"
-	SVCGlasswall    = "glasswall"
+	VENGlasswall    = "glasswall"
 )
 
 type (
@@ -90,13 +90,13 @@ func IsServiceLocal(vendor string, serviceName string, logger *logger.ZLogger) b
 // change name to vendor and add parameter service name
 func GetService(vendor string, serviceName string, logger *logger.ZLogger) Service {
 	switch vendor {
-	case SVCVirusTotal:
+	case VENVirusTotal:
 		return virustotal.NewVirusTotalService(serviceName, logger)
-	case SVCMetaDefender:
+	case VENMetaDefender:
 		return metadefender.NewMetaDefenderService(serviceName, logger)
-	case SVCVmray:
+	case VENVmray:
 		return vmray.NewVmrayService(serviceName, logger)
-	case SVCGlasswall:
+	case VENGlasswall:
 		return glasswall.NewGlasswallService(serviceName, logger)
 	}
 	return nil
