@@ -36,6 +36,8 @@ type Tokens struct {
 
 // Glasswall represents the information regarding the Glasswall service
 type Glasswall struct {
+	serviceName                       string
+	methodName                        string
 	BaseURL                           string
 	Timeout                           time.Duration
 	APIKey                            string
@@ -57,8 +59,10 @@ type Glasswall struct {
 }
 
 // NewGlasswallService returns a new populated instance of the Glasswall service
-func NewGlasswallService(serviceName string, logger *logger.ZLogger) *Glasswall {
+func NewGlasswallService(serviceName string, methodName string, logger *logger.ZLogger) *Glasswall {
 	gw := &Glasswall{
+		serviceName:                       serviceName,
+		methodName:                        methodName,
 		BaseURL:                           readValues.ReadValuesString(serviceName + ".base_url"),
 		Timeout:                           readValues.ReadValuesDuration(serviceName+".timeout") * time.Second,
 		APIKey:                            readValues.ReadValuesString(serviceName + ".api_key"),

@@ -71,7 +71,7 @@ type (
 
 // IsServiceLocal determines if a service is local or not
 func IsServiceLocal(vendor string, serviceName string, logger *logger.ZLogger) bool {
-	svc := GetService(vendor, serviceName, logger)
+	svc := GetService(vendor, serviceName, serviceName, logger)
 
 	if svc != nil {
 		return false
@@ -88,8 +88,8 @@ func IsServiceLocal(vendor string, serviceName string, logger *logger.ZLogger) b
 
 // GetService returns a service based on the service name
 // change name to vendor and add parameter service name
-func GetService(vendor string, serviceName string, logger *logger.ZLogger) Service {
-	switch vendor {
+func GetService(vendorName string, serviceName string, methodName string, logger *logger.ZLogger) Service {
+	switch vendorName {
 	case VENVirusTotal:
 		return virustotal.NewVirusTotalService(serviceName, logger)
 	case VENMetaDefender:
@@ -97,7 +97,7 @@ func GetService(vendor string, serviceName string, logger *logger.ZLogger) Servi
 	case VENVmray:
 		return vmray.NewVmrayService(serviceName, logger)
 	case VENGlasswall:
-		return glasswall.NewGlasswallService(serviceName, logger)
+		return glasswall.NewGlasswallService(serviceName, methodName, logger)
 	}
 	return nil
 }
